@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FARM</title>
+
+  <!-- 必須：LIFF SDK -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans TC",sans-serif;margin:16px;}
+    #lineUserIdDebug{font-size:12px;color:#8a4b00;background:#fff3e6;border:1px solid #ffd9b3;padding:8px;border-radius:8px;white-space:pre-wrap;}
+  </style>
+</head>
+<body>
+  <div id="lineUserIdDebug">診斷中...</div>
+
+  <script>
+    const LIFF_ID = "2009744942-yCYtWMBI";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxqw4AVgCxIntsie8JgehiUzpn-Ihzb8rLlFko1vTLEDv8C-x1dmc0GLFJY1U-8TjZqLQ/exec";
+
+    function api(action, payload){
+      payload = payload || {};
+      payload.action = action;
+      return fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" }, // 穩：避免 preflight
+        body: JSON.stringify(payload)
+      }).then(r => r.json());
+    }
+
+    async function init(){
+      const debugEl = document.getElementById("lineUserIdDebug");
+      try{
+        if(!window.liff) throw new Error("LIFF SDK not loaded");
+
+        debugEl.textContent = "LIFF init...";
+        await liff.init({ liffId: LIFF_ID });
+
+        debugEl.textContent = "LIFF init OK｜loggedIn=" + liff.isLoggedIn() + "｜inClient=" + liff.isInClient();
+
+        if(!liff.isLoggedIn()){
+          debugEl.textContent += "\n呼叫 liff.login()...";
+          liff.login();
+          return;
+        }
+
+        const p = await liff.getProfile();
+        debugEl.textContent =
+          "LIFF profile OK\n" +
+          "userId=" + p.userId + "\n" +
+          "name=" + (p.displayName || "");
+
+        debugEl.textContent += "\n呼叫 getFarmBootstrap...";
+        const boot = await api("getFarmBootstrap", {
+          line_user_id: p.userId,
+          line_name: p.displayName || "LINE會員"
+        });
+
+        debugEl.textContent += "\nAPI 回應 ok=" + !!boot.ok + "\n" + JSON.stringify(boot).slice(0, 400);
+      }catch(e){
+        debugEl.textContent = "FAIL: " + (e && e.message ? e.message : String(e));
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
