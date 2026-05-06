@@ -129,6 +129,9 @@ async function submitJoin() {
   if (data.status === "OK" || data.status === "ALREADY_MEMBER") {
     document.getElementById("joinSection").style.display = "none";
 
+    // ✅ 送出成功後立刻重新查一次會員資料，顯示推薦區/QR code
+    await checkMember(localStorage.getItem("refUserId") || "");
+
     // 只對舊群專屬連結跳社群
     if (campaign === "social") { showSocialModal(); }
   } else { alert("發生錯誤，請稍後再試"); }
