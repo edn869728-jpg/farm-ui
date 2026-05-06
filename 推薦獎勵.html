@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>會員中心</title>
+
+<!-- LIFF SDK -->
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<style>
+body { font-family: Arial; background:#f7f7f7; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; }
+.card { background:white; padding:24px; border-radius:16px; box-shadow:0 4px 12px rgba(0,0,0,0.1); width:90%; max-width:420px; text-align:center; }
+input,button { width:100%; padding:12px; margin-top:10px; border-radius:8px; font-size:14px; }
+button { background:#06C755; color:white; border:none; cursor:pointer; }
+.modal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; justify-content:center; align-items:center; }
+.modal-box { background:white; padding:24px; border-radius:16px; text-align:center; width:85%; max-width:360px; }
+img.qr { width:200px; margin:16px auto; display:block; }
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+  <!-- 新會員區 -->
+  <div id="joinSection" style="display:none;">
+    <h2>加入會員</h2>
+    <p>填寫姓名與電話即可領取 LINE 折價券</p>
+    <input id="name" placeholder="姓名"/>
+    <input id="phone" placeholder="手機號碼"/>
+    <button onclick="submitJoin()">送出並加入</button>
+  </div>
+
+  <!-- 舊會員推薦區 -->
+  <div id="memberSection" style="display:none;">
+    <h2>推薦好友拿獎勵</h2>
+    <p>讓好友掃描 QR Code 填資料，你與好友都可獲得 $10 折價券</p>
+    <img id="qrImg" class="qr"/>
+    <button onclick="copyLink()">複製推薦連結</button>
+  </div>
+
+</div>
+
+<!-- 社群彈窗 -->
+<div id="socialModal" class="modal">
+  <div class="modal-box">
+    <h3>🎉 舊群專屬</h3>
+    <p>點下方按鈕加入官方社群<br>接收最新優惠通知 👇</p>
+    <button onclick="openSocial()">立即加入社群</button>
+  </div>
+</div>
+
+<script>
+const LIFF_ID = "2009103012-Cm3dsFrN";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbziZEHBASKXEyV65ADocSM5SZR7XBY0uVLpoIMc2tlC1RNxZXXmWVd8_B_1IkBqk1zRCw/exec";
+const SOCIAL_URL = "https://lin.ee/Oo4hXKk";
+
+let currentUserId = "";
+let refLink = "";
+let campaign = "";
+
+// 儲存 URL 參數到 localStorage
+(function saveParamsBeforeLogin() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("campaign")) localStorage.setItem("campaign", params.get("campaign"));
+  if (params.get("refUserId")) localStorage.setItem("refUserId", params.get("refUserId"));
+})();
+
+// 初始化 LIFF
+async function init() {
+  await liff.init({ liffId: LIFF_ID });
+
+  if (!liff.isLoggedIn()) {
+    liff.login();
+    return;
+  }
+
+  const profile = await liff.getProfile();
+  currentUserId = profile.userId;
+
+  // 登入後取 localStorage
+  campaign = localStorage.getItem("campaign") || "";
+  const refUserId = localStorage.getItem("refUserId") || "";
+
+  checkMember(refUserId);
+}
+
+// 檢查會員
+async function checkMember(refUserId) {
+  const res = await fetch(GAS_URL + "?userId=" + currentUserId);
+  const data = await res.json();
+
+  if (data.isMember) {
+    showMember(data.refUrl);
+  } else {
+    document.getElementById("joinSection").style.display = "block";
+  }
+}
+
+// 顯示舊會員推薦區
+function showMember(url) {
+  document.getElementById("memberSection").style.display = "block";
+  document.getElementById("joinSection").style.display = "none";
+
+  refLink = url;
+  document.getElementById("qrImg").src =
+    "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(url);
+}
+
+// 提交新會員資料
+async function submitJoin() {
+  const nm = document.getElementById("name").value.trim();
+  const ph = document.getElementById("phone").value.trim();
+  if (!nm || !ph) { alert("請填寫姓名與手機號碼"); return; }
+
+  const params = new URLSearchParams();
+  params.append("userId", currentUserId);
+  params.append("name", nm);
+  params.append("phone", ph);
+
+  const refUserId = localStorage.getItem("refUserId");
+  if (refUserId) params.append("refUserId", refUserId);
+  if (campaign) params.append("campaign", campaign);
+
+  const res = await fetch(GAS_URL, { method:"POST", body:params });
+  const data = await res.json();
+
+  if (data.status === "OK" || data.status === "ALREADY_MEMBER") {
+    document.getElementById("joinSection").style.display = "none";
+
+    // 只對舊群專屬連結跳社群
+    if (campaign === "social") { showSocialModal(); }
+  } else { alert("發生錯誤，請稍後再試"); }
+}
+
+// 顯示社群彈窗
+function showSocialModal() { document.getElementById("socialModal").style.display = "flex"; }
+function openSocial() { liff.openWindow({ url: SOCIAL_URL, external:true }); }
+function copyLink() { navigator.clipboard.writeText(refLink); alert("推薦連結已複製"); }
+
+init();
+</script>
+
+</body>
+</html>
